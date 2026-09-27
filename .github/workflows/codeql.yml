@@ -4,18 +4,31 @@ on:
   push:
     branches:
       - principal
+    # Evita ejecutar el análisis si solo cambiaste documentación, markdown o imágenes
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '**.csv'
+      - 'docs/**'
+      - '.gitignore'
 
   pull_request:
     branches:
       - principal
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '**.csv'
+      - 'docs/**'
+      - '.gitignore'
 
   schedule:
     - cron: "29 21 * * 5"
 
   workflow_dispatch:
 
-permissions:
-  contents: read
+# Inmunidad absoluta: Permisos restrictivos a nivel global (Principio de Menor Privilegio)
+permissions: {}
 
 concurrency:
   group: "codeql-${{ github.workflow }}-${{ github.ref }}"
@@ -25,26 +38,30 @@ jobs:
   analyze:
     name: "CodeQL - Python"
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # Evita que un job colgado consuma minutos infinitos si CodeQL se cicla
 
     permissions:
-      contents: read
-      security-events: write
+      contents: read             # Requerido para clonar el repositorio
+      security-events: write     # Requerido para subir los resultados a GitHub Security Alerts
 
     steps:
+      # Fijado por Hash SHA para inmunidad contra mutación de tags de terceros (Supply Chain Security)
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@6bb024522914be2fe3699458c35513ab0a546d48 # v3.28.10
         with:
           languages: python
           build-mode: none
-          queries: security-extended
+          # Agregamos 'security-and-quality' para capturar fallos de optimización de código,
+          # no solo vulnerabilidades crudas.
+          queries: security-extended,security-and-quality
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@6bb024522914be2fe3699458c35513ab0a546d48 # v3.28.10
         with:
           category: "/language:python"
